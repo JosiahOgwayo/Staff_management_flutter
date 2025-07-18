@@ -15,6 +15,10 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   String? _profilePicUrl;
   String? _username;
+  String? _email;
+  String? _staffNumber;
+  String? _department;
+  int? _yearJoined;
   bool _loading = false;
   final _authService = AuthService();
 
@@ -34,6 +38,10 @@ class _ProfilePageState extends State<ProfilePage> {
           setState(() {
             _profilePicUrl = doc.data()?['profilePicture'];
             _username = doc.data()?['username'] ?? user.displayName ?? user.email;
+            _email = doc.data()?['email'] ?? user.email;
+            _staffNumber = doc.data()?['staffNumber'];
+            _department = doc.data()?['department'];
+            _yearJoined = doc.data()?['yearJoined'];
           });
         }
       }
@@ -289,6 +297,24 @@ Future<void> _pickAndUploadProfilePic() async {
                   ),
                   const SizedBox(height: 12),
                   Text(_username ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          if (_email != null) Text('Email:  $_email'),
+                          if (_staffNumber != null) Text('Staff Number: $_staffNumber'),
+                          if (_department != null) Text('Department: $_department'),
+                          if (_yearJoined != null) Text('Year Joined: $_yearJoined'),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 12),
