@@ -35,6 +35,11 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      // Set user status to online in Firestore
+      final user = AuthService().currentUser;
+      if (user != null) {
+        await AuthService().firestore.collection('users').doc(user.uid).update({'status': 'online'});
+      }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomePage()),

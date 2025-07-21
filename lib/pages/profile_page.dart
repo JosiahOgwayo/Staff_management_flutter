@@ -259,6 +259,10 @@ Future<void> _pickAndUploadProfilePic() async {
 
   Future<void> _logout() async {
     try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        await _authService.firestore.collection('users').doc(user.uid).update({'status': 'offline'});
+      }
       await _authService.signOut();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(

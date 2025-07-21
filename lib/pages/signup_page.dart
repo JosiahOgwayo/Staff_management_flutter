@@ -66,7 +66,7 @@ class _SignupPageState extends State<SignupPage> {
         return;
       }
       if (!mounted) return;
-      // After email registration and verification, go to phone verification
+      
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => PhoneVerificationPage(
