@@ -34,91 +34,87 @@ class _ProfilePageState extends State<ProfilePage> {
       final user = _authService.currentUser;
       if (user != null) {
         final doc = await _authService.firestore.collection('users').doc(user.uid).get();
-        if (mounted) {
-          setState(() {
-            _profilePicUrl = doc.data()?['profilePicture'];
-            _username = doc.data()?['username'] ?? user.displayName ?? user.email;
-            _email = doc.data()?['email'] ?? user.email;
-            _staffNumber = doc.data()?['staffNumber'];
-            _department = doc.data()?['department'];
-            _yearJoined = doc.data()?['yearJoined'];
-          });
-        }
+        if (!mounted) return;
+        setState(() {
+          _profilePicUrl = doc.data()?['profilePicture'];
+          _username = doc.data()?['username'] ?? user.displayName ?? user.email;
+          _email = doc.data()?['email'] ?? user.email;
+          _staffNumber = doc.data()?['staffNumber'];
+          _department = doc.data()?['department'];
+          _yearJoined = doc.data()?['yearJoined'];
+        });
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load user data:  ${e.toString()}')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load user data: ${e.toString()}'))
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
-Future<void> _pickAndUploadProfilePic() async {
-  try {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
 
-    final croppedFile = await ImageCropper().cropImage(
-      sourcePath: picked.path,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Image',
-          toolbarColor: Colors.grey,
-          toolbarWidgetColor: Colors.white,
-          initAspectRatio: CropAspectRatioPreset.square,
-          lockAspectRatio: false,
-          cropStyle: CropStyle.rectangle,
-          showCropGrid: true,
-          hideBottomControls: false,
+  Future<void> _pickAndUploadProfilePic() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Image',
+            toolbarColor: Colors.black,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: false,
+            cropStyle: CropStyle.rectangle,
+            showCropGrid: true,
+            hideBottomControls: false,
+          ),
+          IOSUiSettings(
+            title: 'Crop Image',
+            aspectRatioLockEnabled: false,
+            rotateButtonsHidden: false,
+            resetButtonHidden: false,
+            aspectRatioPickerButtonHidden: false,
+          ),
+        ],
+      );
+
+      if (!mounted || croppedFile == null) return;
+
+      setState(() => _loading = true);
+
+      final url = await _authService.uploadProfilePicture(
+        _authService.currentUser!.uid,
+        croppedFile.path,
+      );
+
+      if (!mounted) return;
+
+      setState(() => _profilePicUrl = url);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile picture updated!'),
+          backgroundColor: Colors.green,
         ),
-        IOSUiSettings(
-          title: 'Crop Image',
-          aspectRatioLockEnabled: false,
-          rotateButtonsHidden: false,
-          resetButtonHidden: false,
-          aspectRatioPickerButtonHidden: false,
-        ),
-      ],
-    );
-
-    // ✅ Exit early if crop was cancelled
-    if (!mounted || croppedFile == null) return;
-
-    setState(() => _loading = true);
-
-    final url = await _authService.uploadProfilePicture(
-      _authService.currentUser!.uid,
-      croppedFile.path,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _profilePicUrl = url;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profile picture updated!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    if (mounted) {
+      );
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to upload profile picture: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-  } finally {
-    if (mounted) setState(() => _loading = false);
   }
-}
-
-
 
   String? getOptimizedCloudinaryUrl(String? url) {
     if (url == null || !url.contains('/upload/')) return url;
@@ -136,26 +132,35 @@ Future<void> _pickAndUploadProfilePic() async {
           decoration: const InputDecoration(labelText: 'New Username'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text('Cancel')
+          ),
           ElevatedButton(
             onPressed: () async {
               final newName = controller.text.trim();
               if (newName.isEmpty) return;
               try {
                 await _authService.updateUsername(newName, updateFirestore: true);
+                if (!mounted) return;
                 setState(() => _username = newName);
-                if (mounted) Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Username updated!'), backgroundColor: Colors.green),
-                  );
-                }
+                if (!mounted) return;
+                Navigator.pop(context);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Username updated!'), 
+                    backgroundColor: Colors.green
+                  ),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed:  ${e.toString()}'), backgroundColor: Colors.red),
-                  );
-                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed: ${e.toString()}'), 
+                    backgroundColor: Colors.red
+                  ),
+                );
               }
             },
             child: const Text('Update'),
@@ -177,20 +182,33 @@ Future<void> _pickAndUploadProfilePic() async {
           obscureText: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text('Cancel')
+          ),
           ElevatedButton(
             onPressed: () async {
               final newPassword = controller.text.trim();
               if (newPassword.length < 6) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Password must be at least 6 characters'))
+                );
                 return;
               }
               try {
                 await _authService.changePassword(newPassword);
-                if (mounted) Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed!')));
+                if (!mounted) return;
+                Navigator.pop(context);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Password changed!'))
+                );
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed:  ${e.toString()}')));
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed: ${e.toString()}'))
+                );
               }
             },
             child: const Text('Change'),
@@ -223,7 +241,10 @@ Future<void> _pickAndUploadProfilePic() async {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text('Cancel')
+          ),
           ElevatedButton(
             onPressed: () async {
               final email = emailController.text.trim();
@@ -231,23 +252,28 @@ Future<void> _pickAndUploadProfilePic() async {
               if (email.isEmpty || password.isEmpty) return;
               try {
                 await _authService.deleteAccountAndData(email, password);
-                if (mounted) Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Account deleted.'), backgroundColor: Colors.green),
-                  );
-                  // Navigate to login page and remove all previous routes
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
-                }
+                if (!mounted) return;
+                Navigator.pop(context);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Account deleted.'), 
+                    backgroundColor: Colors.green
+                  ),
+                );
+                if (!mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed:  ${e.toString()}'), backgroundColor: Colors.red),
-                  );
-                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed: ${e.toString()}'), 
+                    backgroundColor: Colors.red
+                  ),
+                );
               }
             },
             child: const Text('Delete'),
@@ -271,7 +297,11 @@ Future<void> _pickAndUploadProfilePic() async {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to log out:  ${e.toString()}')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to log out: ${e.toString()}'))
+        );
+      }
     }
   }
 
@@ -290,17 +320,29 @@ Future<void> _pickAndUploadProfilePic() async {
                     child: _profilePicUrl != null && _profilePicUrl!.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: getOptimizedCloudinaryUrl(_profilePicUrl!)!,
-                            placeholder: (context, url) => const CircleAvatar(radius: 60, child: CircularProgressIndicator()),
-                            errorWidget: (context, url, error) => const CircleAvatar(radius: 60, child: Icon(Icons.error)),
+                            placeholder: (context, url) => const CircleAvatar(
+                              radius: 60, 
+                              child: CircularProgressIndicator()
+                            ),
+                            errorWidget: (context, url, error) => const CircleAvatar(
+                              radius: 60, 
+                              child: Icon(Icons.error)
+                            ),
                             imageBuilder: (context, imageProvider) => CircleAvatar(
                               radius: 60,
                               backgroundImage: imageProvider,
                             ),
                           )
-                        : const CircleAvatar(radius: 60, child: Icon(Icons.person, size: 60)),
+                        : const CircleAvatar(
+                            radius: 60, 
+                            child: Icon(Icons.person, size: 60)
+                          ),
                   ),
                   const SizedBox(height: 12),
-                  Text(_username ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(
+                    _username ?? '', 
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+                  ),
                   const SizedBox(height: 8),
                   Card(
                     margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
@@ -309,9 +351,12 @@ Future<void> _pickAndUploadProfilePic() async {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Text(
+                            'Details', 
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                          ),
                           const SizedBox(height: 8),
-                          if (_email != null) Text('Email:  $_email'),
+                          if (_email != null) Text('Email: $_email'),
                           if (_staffNumber != null) Text('Staff Number: $_staffNumber'),
                           if (_department != null) Text('Department: $_department'),
                           if (_yearJoined != null) Text('Year Joined: $_yearJoined'),
@@ -322,7 +367,10 @@ Future<void> _pickAndUploadProfilePic() async {
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 12),
-                  const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text(
+                    'Settings', 
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
+                  ),
                   ListTile(
                     leading: const Icon(Icons.edit),
                     title: const Text('Update Username'),
@@ -360,4 +408,4 @@ Future<void> _pickAndUploadProfilePic() async {
             ),
     );
   }
-} 
+}

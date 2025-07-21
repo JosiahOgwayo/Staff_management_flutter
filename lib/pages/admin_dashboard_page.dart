@@ -25,6 +25,9 @@ class AdminDashboardPage extends StatelessWidget {
     String? title, description, assignedTo;
     String status = 'pending';
     List<Map<String, dynamic>> employees = await _fetchEmployees();
+    
+    if (!context.mounted) return;
+    
     showDialog(
       context: context,
       builder: (context) {
@@ -84,10 +87,15 @@ class AdminDashboardPage extends StatelessWidget {
                     'status': status,
                     'createdAt': DateTime.now().toIso8601String(),
                   });
+                  
+                  if (!context.mounted) return;
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Task created and assigned!'), backgroundColor: Colors.green),
-                  );
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Task created and assigned!'), backgroundColor: Colors.green),
+                    );
+                  }
                 }
               },
               child: const Text('Create'),
@@ -155,6 +163,7 @@ class AdminDashboardPage extends StatelessWidget {
         future: _isAdmin(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done && snapshot.data == true) {
+            if (!context.mounted) return const SizedBox.shrink();
             return FloatingActionButton(
               onPressed: () => _showCreateTaskDialog(context),
               tooltip: 'Create & Assign Task',
@@ -166,4 +175,4 @@ class AdminDashboardPage extends StatelessWidget {
       ),
     );
   }
-} 
+}

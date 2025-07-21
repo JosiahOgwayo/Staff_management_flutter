@@ -109,19 +109,19 @@ class AuthService{
 
   Future<void> deleteAccountAndData(String email, String password) async {
     try {
-      print('Starting account deletion for $email');
+      debugPrint('Starting account deletion for $email');
       AuthCredential credential = EmailAuthProvider.credential(email: email, password: password);
-      print('Reauthenticating...');
+      debugPrint('Reauthenticating...');
       await currentUser!.reauthenticateWithCredential(credential);
-      print('Deleting user data from Firestore...');
+      debugPrint('Deleting user data from Firestore...');
       await firestore.collection('users').doc(currentUser!.uid).delete();
-      print('Deleting user from Firebase Auth...');
+      debugPrint('Deleting user from Firebase Auth...');
       await currentUser!.delete();
-      print('Signing out...');
+      debugPrint('Signing out...');
       await firebaseAuth.signOut();
-      print('Account deletion complete.');
+      debugPrint('Account deletion complete.');
     } catch (e) {
-      print('Error during account deletion: $e');
+      debugPrint('Error during account deletion: $e');
       rethrow;
     }
   }
@@ -158,7 +158,7 @@ class AuthService{
       await firestore.collection('users').doc(uid).update({'profilePicture': url});
       return url;
     } catch (e) {
-      print('Upload error: $e');
+      debugPrint('Upload error: $e');
       rethrow;
     }
   }
