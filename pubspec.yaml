@@ -46,6 +46,8 @@ dependencies:
   path: ^1.9.1
   cached_network_image: ^3.2.3
   image_cropper: ^9.1.0
+  flutter_local_notifications: ^19.3.1
+  intl: ^0.20.2
   
 
 dev_dependencies:

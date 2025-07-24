@@ -52,5 +52,5 @@ A powerful employee management mobile application built with **Flutter**, **Fire
 
 - Flutter SDK installed
 - Firebase project set up
-- Python 3.x (for admin scripts / push notifications)
+- Python 3.13.4 (for admin scripts / push notifications)
 - VSCode (with Flutter plugins)

@@ -5,9 +5,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 final ValueNotifier<AuthService?> authServiceNotifier = ValueNotifier<AuthService?>(AuthService());
-
 
 class AuthService{
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
@@ -17,14 +17,17 @@ class AuthService{
   User? get currentUser => firebaseAuth.currentUser;
 
   Stream<User?> get authStateChanges => firebaseAuth.authStateChanges();
-  
+
   Future<UserCredential> signIn({
     required String email, 
     required String password,
-  }) async{
-    return await firebaseAuth.signInWithEmailAndPassword(
-        email: email, password: password);
+  }) async {
+    final credential = await firebaseAuth.signInWithEmailAndPassword(
+      email: email, password: password);
+    
+    return credential;
   }
+  
 
   Future<UserCredential> createAccount({
     required String email,
@@ -48,8 +51,8 @@ class AuthService{
     required String userName,
   }) async{
     await currentUser!.updateDisplayName(userName);
-
   }
+
   Future<void> deleteAccount(
     String email,
     String password,
@@ -63,6 +66,7 @@ class AuthService{
     await currentUser!.delete();
     await firebaseAuth.signOut();
   }
+
   Future<void> resetPasswordFromCurrentPassword({
     required String currentPassword,
     required String newPassword,
@@ -162,4 +166,85 @@ class AuthService{
       rethrow;
     }
   }
+
+  Future<void> clockIn() async {
+    final user = currentUser;
+    if (user == null) return;
+
+    final today = DateTime.now();
+    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    final docRef = firestore
+        .collection('clockins')
+        .doc(dateStr)
+        .collection('entries')
+        .doc(user.uid);
+
+    final doc = await docRef.get();
+
+    if (doc.exists) {
+      debugPrint("User has already clocked in today.");
+      return;
+    }
+
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
+    final userData = userDoc.data() ?? {};
+
+    await docRef.set({
+      'uid': user.uid,
+      'email': user.email,
+      'username': user.displayName ?? userData['username'] ?? user.email,
+      'clockedInAt': Timestamp.now(),
+    });
+
+    debugPrint("Clock-in successful.");
+  }
+
+  /// Call this after user signs in or registers to save/update their FCM token in Firestore.
+  Future<void> saveFcmToken() async {
+    final user = currentUser;
+    if (user != null) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await firestore.collection('users').doc(user.uid).update({'fcmToken': token});
+        debugPrint('FCM token saved to Firestore for user: ${user.uid}');
+      }
+    }
+  }
+
+  /*
+  /// Send a push notification via FCM HTTP v1 API
+  /// Deprecated: Use backend (firebase-admin) for sending notifications.
+  Future<void> sendPushNotification({
+    required String fcmToken,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    const String serverKey = 'YOUR_SERVER_KEY'; 
+    final url = Uri.parse('https://fcm.googleapis.com/fcm/send');
+
+    final payload = {
+      'to': fcmToken,
+      'notification': {
+        'title': title,
+        'body': body,
+      },
+      'data': data ?? {},
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'key=$serverKey',
+      },
+      body: json.encode(payload),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to send notification: ${response.body}');
+    }
+  }
+  */
 }

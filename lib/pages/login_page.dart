@@ -35,6 +35,9 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      // Save FCM token after successful login
+      await AuthService().saveFcmToken();
+
       // Set user status to online in Firestore
       final user = AuthService().currentUser;
       if (user != null) {

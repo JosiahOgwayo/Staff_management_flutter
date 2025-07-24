@@ -4,6 +4,7 @@ import 'package:employee_app_new/auth_service.dart';
 import 'package:employee_app_new/pages/phone_verification_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -41,11 +42,14 @@ class _SignupPageState extends State<SignupPage> {
 
   void _register() {
     if (_formKey.currentState!.validate()) {
-      setState(() { _isRegistering = true; _registrationError = null; });
+      setState(() {
+        _isRegistering = true;
+        _registrationError = null;
+      });
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
       _performRegistration(email, password).whenComplete(() {
-        if (mounted) setState(() { _isRegistering = false; });
+        if (mounted) setState(() => _isRegistering = false);
       });
     }
   }
@@ -53,6 +57,9 @@ class _SignupPageState extends State<SignupPage> {
   Future<void> _performRegistration(String email, String password) async {
     try {
       final userCredential = await AuthService().createAccount(email: email, password: password);
+      // Save FCM token after successful signup
+      await AuthService().saveFcmToken();
+
       final user = userCredential.user;
       if (user != null && !user.emailVerified) {
         await user.sendEmailVerification();
@@ -60,12 +67,12 @@ class _SignupPageState extends State<SignupPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Verification email sent. Please check your inbox.'), backgroundColor: Colors.blue),
         );
-        if (!mounted) return;
         _showEmailVerificationDialog(user);
         return;
       }
+
       if (!mounted) return;
-      
+
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => PhoneVerificationPage(
@@ -75,6 +82,9 @@ class _SignupPageState extends State<SignupPage> {
                 department: _selectedDepartment!,
                 year: DateTime.now().year,
               );
+
+              final fcmToken = await FirebaseMessaging.instance.getToken();
+
               final userInfo = {
                 'email': _emailController.text.trim(),
                 'phone': _phoneController.text.trim(),
@@ -86,24 +96,23 @@ class _SignupPageState extends State<SignupPage> {
                 'createdAt': DateTime.now().toIso8601String(),
                 'staffNumber': staffNumber,
                 'yearJoined': DateTime.now().year,
+                'fcmToken': fcmToken, // Save FCM token
               };
+
               try {
                 await AuthService().saveUserInfo(uid: uid, data: userInfo);
                 if (!mounted) return;
-                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Registration successful! Please login.'), backgroundColor: Colors.green),
                 );
                 await Future.delayed(const Duration(seconds: 1));
                 if (!mounted) return;
-                // ignore: use_build_context_synchronously
                 await Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                   (route) => false,
                 );
               } catch (e) {
                 if (!mounted) return;
-                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Failed to save user info: ${e.toString()}'), backgroundColor: Colors.red),
                 );
@@ -131,15 +140,17 @@ class _SignupPageState extends State<SignupPage> {
           message = 'Registration failed: ${e.message ?? e.code}';
       }
       if (!mounted) return;
-      setState(() { _registrationError = message; });
-      if (!mounted) return;
+      setState(() {
+        _registrationError = message;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() { _registrationError = 'Registration failed: ${e.toString()}'; });
-      if (!mounted) return;
+      setState(() {
+        _registrationError = 'Registration failed: ${e.toString()}';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration failed: ${e.toString()}'), backgroundColor: Colors.red),
       );
@@ -160,47 +171,49 @@ class _SignupPageState extends State<SignupPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('A verification link has been sent to your email. Please verify your email before continuing.'),
-                  if (_isCheckingVerification) const Padding(
-                    padding: EdgeInsets.only(top: 16),
-                    child: CircularProgressIndicator(),
-                  ),
+                  if (_isCheckingVerification)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: CircularProgressIndicator(),
+                    ),
                 ],
               ),
               actions: [
                 TextButton(
-                  // ignore: dead_code
-                  onPressed: isResending ? null : () async {
-                    setState(() { isResending = true; });
-                    try {
-                      await user.sendEmailVerification();
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Verification email resent.'), backgroundColor: Colors.green),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to resend email: ${e.toString()}'), backgroundColor: Colors.red),
-                      );
-                    }
-                    if (!context.mounted) return;
-                    setState(() { isResending = false; });
-                  },
-                  child: isResending 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                  onPressed: isResending
+                      // ignore: dead_code
+                      ? null
+                      : () async {
+                          setState(() => isResending = true);
+                          try {
+                            await user.sendEmailVerification();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Verification email resent.'), backgroundColor: Colors.green),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to resend email: ${e.toString()}'), backgroundColor: Colors.red),
+                            );
+                          }
+                          if (!context.mounted) return;
+                          setState(() => isResending = false);
+                        },
+                  child: isResending
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Text('Resend Email'),
                 ),
                 TextButton(
                   onPressed: () async {
-                    setState(() { _isCheckingVerification = true; });
+                    setState(() => _isCheckingVerification = true);
                     try {
                       await user.reload();
                       final refreshedUser = AuthService().firebaseAuth.currentUser;
                       if (refreshedUser != null && refreshedUser.emailVerified) {
                         if (!context.mounted) return;
                         Navigator.of(context).pop();
-                        if (!context.mounted) return;
-                        await Navigator.of(context).push(
+                        await Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (context) => PhoneVerificationPage(
                               phoneNumber: _phoneController.text.trim(),
@@ -209,6 +222,9 @@ class _SignupPageState extends State<SignupPage> {
                                   department: _selectedDepartment!,
                                   year: DateTime.now().year,
                                 );
+
+                                final fcmToken = await FirebaseMessaging.instance.getToken();
+
                                 final userInfo = {
                                   'email': _emailController.text.trim(),
                                   'phone': _phoneController.text.trim(),
@@ -220,23 +236,22 @@ class _SignupPageState extends State<SignupPage> {
                                   'createdAt': DateTime.now().toIso8601String(),
                                   'staffNumber': staffNumber,
                                   'yearJoined': DateTime.now().year,
+                                  'fcmToken': fcmToken,
                                 };
+
                                 try {
                                   await AuthService().saveUserInfo(uid: uid, data: userInfo);
                                   if (!mounted) return;
-                                  // ignore: use_build_context_synchronously
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('Registration successful! Please login.'), backgroundColor: Colors.green),
                                   );
                                   await Future.delayed(const Duration(seconds: 1));
                                   if (!mounted) return;
-                                  // ignore: use_build_context_synchronously
                                   await Navigator.of(context).pushReplacement(
                                     MaterialPageRoute(builder: (context) => const LoginPage()),
                                   );
                                 } catch (e) {
                                   if (!mounted) return;
-                                  // ignore: use_build_context_synchronously
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Failed to save user info: ${e.toString()}'), backgroundColor: Colors.red),
                                   );
@@ -247,14 +262,14 @@ class _SignupPageState extends State<SignupPage> {
                         );
                       } else {
                         if (!context.mounted) return;
-                        setState(() { _isCheckingVerification = false; });
+                        setState(() => _isCheckingVerification = false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Email not verified yet. Please check your inbox.'), backgroundColor: Colors.orange),
                         );
                       }
                     } catch (e) {
                       if (!context.mounted) return;
-                      setState(() { _isCheckingVerification = false; });
+                      setState(() => _isCheckingVerification = false);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error checking verification: ${e.toString()}'), backgroundColor: Colors.red),
                       );
@@ -468,7 +483,7 @@ class _SignupPageState extends State<SignupPage> {
             ],
           ),
         ),
-      ),
-    );
+),
+);
   }
 }

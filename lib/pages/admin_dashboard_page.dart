@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:employee_app_new/auth_service.dart';
+import 'package:intl/intl.dart';
 
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
@@ -25,9 +26,9 @@ class AdminDashboardPage extends StatelessWidget {
     String? title, description, assignedTo;
     String status = 'pending';
     List<Map<String, dynamic>> employees = await _fetchEmployees();
-    
+
     if (!context.mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -87,13 +88,15 @@ class AdminDashboardPage extends StatelessWidget {
                     'status': status,
                     'createdAt': DateTime.now().toIso8601String(),
                   });
-                  
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                  
+
+                  // Show in-app notification (SnackBar)
                   if (context.mounted) {
+                    Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Task created and assigned!'), backgroundColor: Colors.green),
+                      SnackBar(
+                        content: Text('Task assigned to employee!'),
+                        backgroundColor: Colors.blue,
+                      ),
                     );
                   }
                 }
@@ -108,6 +111,8 @@ class AdminDashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
     return Scaffold(
       appBar: AppBar(title: const Text('Admin Dashboard')),
       body: FutureBuilder<bool>(
@@ -119,43 +124,83 @@ class AdminDashboardPage extends StatelessWidget {
           if (!snapshot.hasData || !snapshot.data!) {
             return const Center(child: Text('Access denied. Admins only.'));
           }
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
-            builder: (context, taskSnapshot) {
-              if (taskSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (taskSnapshot.hasError) {
-                return Center(child: Text('Error: \\${taskSnapshot.error}'));
-              }
-              final tasks = taskSnapshot.data?.docs ?? [];
-              if (tasks.isEmpty) {
-                return const Center(child: Text('No tasks found.'));
-              }
-              return ListView.builder(
-                itemCount: tasks.length,
-                itemBuilder: (context, index) {
-                  final task = tasks[index].data() as Map<String, dynamic>;
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: ListTile(
-                      title: Text(task['title'] ?? 'No Title'),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (task['description'] != null)
-                            Text('Description: \\${task['description']}'),
-                          if (task['assignedTo'] != null)
-                            Text('Assigned To: \\${task['assignedTo']}'),
-                          if (task['status'] != null)
-                            Text('Status: \\${task['status']}'),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('clock_ins')
+                      .where('status', isEqualTo: 'clocked_in')
+                      .where('clockInTime', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+                      .snapshots(),
+                  builder: (context, clockInSnapshot) {
+                    if (clockInSnapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    }
+                    final users = clockInSnapshot.data?.docs ?? [];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('Clocked-in Users (Today):', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        ...users.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final timeStr = data['clockInTime']?.toDate() != null
+                              ? DateFormat('E h:mm a').format(data['clockInTime'].toDate())
+                              : 'N/A';
+                          return ListTile(
+                            title: Text(data['name'] ?? data['email'] ?? data['uid']),
+                            subtitle: Text('Clock-in Time: $timeStr'),
+                          );
+                        }),
+                      ],
+                    );
+                  },
+                ),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+                  builder: (context, taskSnapshot) {
+                    if (taskSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (taskSnapshot.hasError) {
+                      return Center(child: Text('Error: ${taskSnapshot.error}'));
+                    }
+                    final tasks = taskSnapshot.data?.docs ?? [];
+                    if (tasks.isEmpty) {
+                      return const Center(child: Text('No tasks found.'));
+                    }
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = tasks[index].data() as Map<String, dynamic>;
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                          child: ListTile(
+                            title: Text(task['title'] ?? 'No Title'),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (task['description'] != null)
+                                  Text('Description: ${task['description']}'),
+                                if (task['assignedTo'] != null)
+                                  Text('Assigned To: ${task['assignedTo']}'),
+                                if (task['status'] != null)
+                                  Text('Status: ${task['status']}'),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           );
         },
       ),
