@@ -1,15 +1,56 @@
-# employee_app_new
-A new Flutter project.
+# Employee Management App
+
+A powerful employee management mobile application built with **Flutter**, **Firebase**, and **Python** (Firebase Admin SDK). This app enables admins to manage staff, assign tasks, authenticate users, and send push notifications — all from an intuitive mobile interface.
+
+---
+
+## Features
+
+### Authentication
+
+- Email and password login/signup
+- Phone number authentication via OTP
+
+### User & Profile Management
+
+- Admins can add, view, and manage employee accounts
+- Each staff member has a detailed profile page (editable and viewable)
+
+### Clock-In System
+
+- Staff can clock in daily with time tracking
+- Admins can view attendance and prevent duplicate clock-ins
+
+### Push Notifications *(In Progress)*
+
+- Admins receive notifications when staff clock in
+- Built using Firebase Cloud Messaging (manual push via Python & Flutter)
+
+### Admin Dashboard
+
+- Create and assign tasks
+- View list of employees
+- Manage user roles and permissions
+
+---
+
+## Tech Stack
+
+| Layer        | Technology                         |
+|------------- |------------------------------------|
+| Frontend     | Flutter (Dart)                     |
+| Backend      | Firebase (Firestore, Auth, FCM)    |
+| Admin SDK    | Python (`firebase-admin`)          |
+| Notifications| Firebase Cloud Messaging (FCM)     |
+| State Mgmt   | Notifier-based                     |
+
+---
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Prerequisites
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter SDK installed
+- Firebase project set up
+- Python 3.x (for admin scripts / push notifications)
+- VSCode (with Flutter plugins)
