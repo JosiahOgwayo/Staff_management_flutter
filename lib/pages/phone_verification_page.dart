@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'package:employee_app_new/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -68,39 +69,49 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
   }
 
   void _verifyCode() async {
-    if (_verificationId == null) return;
+  if (_verificationId == null) return;
+
+  setState(() {
+    _isLoading = true;
+    _error = null;
+  });
+
+  try {
+    final credential = PhoneAuthProvider.credential(
+      verificationId: _verificationId!,
+      smsCode: _otpController.text.trim(),
+    );
+
+    final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
 
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _isLoading = false;
     });
 
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: _otpController.text.trim(),
-      );
+    // Call the callback
+    widget.onVerified(userCredential.user!.uid);
 
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      widget.onVerified(userCredential.user!.uid);
-
-      setState(() {
-        _isLoading = false;
-      });
-
+    // Show success message and navigate to login
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Phone verified! Please log in.')),
+        const SnackBar(content: Text('Phone verified successfully! Please login.')),
       );
 
-      Navigator.pushReplacementNamed(context, '/login');
+      
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
 
-    } catch (e) {
-      setState(() {
-        _error = 'Invalid OTP or verification failed.';
-        _isLoading = false;
-      });
     }
+  } catch (e) {
+    setState(() {
+      _error = 'Invalid OTP or verification failed.';
+      _isLoading = false;
+    });
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
