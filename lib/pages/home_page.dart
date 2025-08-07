@@ -1,12 +1,20 @@
 import 'package:employee_app_new/auth_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:employee_app_new/pages/profile_page.dart';
 import 'package:employee_app_new/pages/admin_dashboard_page.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
+   void _requestNotificationPermission() async {
+    await FirebaseMessaging.instance.requestPermission();
+    debugPrint('🔔 Notification Permission Requested');
+  }
+
   @override
   Widget build(BuildContext context) {
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestNotificationPermission());
     return  Scaffold(
       appBar: AppBar(
         title: Text(

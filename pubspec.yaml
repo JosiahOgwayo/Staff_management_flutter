@@ -38,7 +38,7 @@ dependencies:
   firebase_auth: ^5.6.2
   cloud_firestore: ^5.6.11
   firebase_storage: ^12.4.9
-  firebase_messaging: ^15.2.9
+  firebase_messaging: ^15.2.10
   image_picker: ^1.0.7
   firebase_database: ^11.3.9
   http: ^1.4.0
@@ -48,6 +48,7 @@ dependencies:
   image_cropper: ^9.1.0
   flutter_local_notifications: ^19.3.1
   intl: ^0.20.2
+  provider: ^6.1.5
   
 
 dev_dependencies:
@@ -60,6 +61,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  #flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -101,7 +103,13 @@ flutter:
   #         weight: 700
   #
   # For details regarding fonts from package dependencies,
+ 
   # see https://flutter.dev/to/font-from-package
+#flutter_icons:
+  #android: true
+  #ios: true
+  #image_path: "assets/icon/ic_notification.png"
+  #android_notification_icon: true  
 dependency_overrides:
   characters: ^1.4.1
   meta: ^1.17.0

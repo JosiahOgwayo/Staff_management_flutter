@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+.packages
+pubspec.lock
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +45,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Ignore Firebase Admin SDK Credentials - DO NOT COMMIT
+flutter-firebase-app-570e6-9c0fb46eb964.json
+backend_push/secrets/flutter-firebase-app-570e6-9c0fb46eb964.json
+secrets/flutter-firebase-app-570e6-9c0fb46eb964.json
+.env
+secrets/
+# Environment files
+.env
+.env.*
+!.env.example
+

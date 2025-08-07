@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 // import 'package:get/get.dart';
@@ -6,7 +8,31 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:employee_app_new/auth_service.dart';
 import 'package:employee_app_new/pages/login_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
+Future<void> sendPushToAdmin(String token, String title, String body) async {
+  const url = 'http://127.0.0.1:8000/send-notification/'; 
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'token': token,
+        'title': title,
+        'body': body,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      debugPrint('✅ Notification sent to $token');
+    } else {
+      debugPrint('❌ Failed to send: ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('❌ Error sending notification: $e');
+  }
+}
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -33,7 +59,7 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _loadUserData();
     _checkClockInStatus();
-    // Save/update FCM token when profile loads
+    //It Save/update FCM token when profile loads
     AuthService().saveFcmToken();
   }
 
@@ -63,10 +89,29 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final auth = authServiceNotifier.value;
       await auth?.clockIn();
+
       setState(() => _isClockedIn = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You have clocked in.'))
       );
+          // AFTER CLOCK-IN: It fetch all admins and send push
+      final admins = await _authService.firestore
+        .collection('users')
+        .where('role', isEqualTo: 'admin')
+        .get();
+
+      for (var doc in admins.docs) {
+      final token = doc['fcmToken'];
+      if (token != null && token is String && token.isNotEmpty) {
+        await sendPushToAdmin(
+          token,
+          'Employee Clock In',
+          '$_username just clocked in.',
+        );
+      }
+      }
+
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to clock in.'))

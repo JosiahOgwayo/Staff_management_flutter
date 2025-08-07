@@ -1,3 +1,6 @@
+// ignore_for_file: use_build_context_synchronously
+
+import 'package:employee_app_new/services/push_notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:employee_app_new/auth_service.dart';
 import 'package:employee_app_new/pages/home_page.dart';
@@ -38,11 +41,16 @@ class _LoginPageState extends State<LoginPage> {
       // Save FCM token after successful login
       await AuthService().saveFcmToken();
 
+      await PushNotificationService.initialize(context);
+
       // Set user status to online in Firestore
       final user = AuthService().currentUser;
       if (user != null) {
         await AuthService().firestore.collection('users').doc(user.uid).update({'status': 'online'});
       }
+
+      
+      
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomePage()),

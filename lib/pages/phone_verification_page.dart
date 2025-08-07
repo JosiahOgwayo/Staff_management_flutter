@@ -1,10 +1,17 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class PhoneVerificationPage extends StatefulWidget {
   final String phoneNumber;
   final Function(String uid) onVerified;
-  const PhoneVerificationPage({super.key, required this.phoneNumber, required this.onVerified});
+
+  const PhoneVerificationPage({
+    super.key,
+    required this.phoneNumber,
+    required this.onVerified,
+  });
 
   @override
   State<PhoneVerificationPage> createState() => _PhoneVerificationPageState();
@@ -23,38 +30,75 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
   }
 
   void _sendCode() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: widget.phoneNumber,
       verificationCompleted: (PhoneAuthCredential credential) async {
-        // Auto-retrieval or instant verification
         await FirebaseAuth.instance.signInWithCredential(credential);
         widget.onVerified(FirebaseAuth.instance.currentUser!.uid);
+
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Phone verified successfully!')),
+        );
+        Navigator.pushReplacementNamed(context, '/login');
       },
       verificationFailed: (FirebaseAuthException e) {
-        setState(() { _error = e.message; _isLoading = false; });
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
       },
       codeSent: (String verificationId, int? resendToken) {
-        setState(() { _verificationId = verificationId; _isLoading = false; });
+        setState(() {
+          _verificationId = verificationId;
+          _isLoading = false;
+        });
       },
       codeAutoRetrievalTimeout: (String verificationId) {
-        setState(() { _verificationId = verificationId; });
+        setState(() {
+          _verificationId = verificationId;
+        });
       },
     );
   }
 
   void _verifyCode() async {
     if (_verificationId == null) return;
-    setState(() { _isLoading = true; _error = null; });
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final credential = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
         smsCode: _otpController.text.trim(),
       );
+
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       widget.onVerified(userCredential.user!.uid);
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone verified! Please log in.')),
+      );
+
+      Navigator.pushReplacementNamed(context, '/login');
+
     } catch (e) {
-      setState(() { _error = 'Invalid OTP or verification failed.'; _isLoading = false; });
+      setState(() {
+        _error = 'Invalid OTP or verification failed.';
+        _isLoading = false;
+      });
     }
   }
 
@@ -75,10 +119,13 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
               decoration: const InputDecoration(labelText: 'OTP'),
             ),
             const SizedBox(height: 16),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red)),
             ElevatedButton(
               onPressed: _isLoading ? null : _verifyCode,
-              child: _isLoading ? const CircularProgressIndicator() : const Text('Verify'),
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('Verify'),
             ),
             TextButton(
               onPressed: _isLoading ? null : _sendCode,
@@ -89,4 +136,4 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
       ),
     );
   }
-} 
+}

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:employee_app_new/pages/login_page.dart';
 import 'package:employee_app_new/auth_service.dart';
@@ -48,6 +50,7 @@ class _SignupPageState extends State<SignupPage> {
       });
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
+      
       _performRegistration(email, password).whenComplete(() {
         if (mounted) setState(() => _isRegistering = false);
       });
@@ -56,7 +59,7 @@ class _SignupPageState extends State<SignupPage> {
 
   Future<void> _performRegistration(String email, String password) async {
     try {
-      final userCredential = await AuthService().createAccount(email: email, password: password);
+      final userCredential = await AuthService().createAccount(email: email, password: password, username: _usernameController.text.trim());
       // Save FCM token after successful signup
       await AuthService().saveFcmToken();
 
@@ -97,6 +100,7 @@ class _SignupPageState extends State<SignupPage> {
                 'staffNumber': staffNumber,
                 'yearJoined': DateTime.now().year,
                 'fcmToken': fcmToken, // Save FCM token
+                'role': 'user',
               };
 
               try {
@@ -237,6 +241,7 @@ class _SignupPageState extends State<SignupPage> {
                                   'staffNumber': staffNumber,
                                   'yearJoined': DateTime.now().year,
                                   'fcmToken': fcmToken,
+                                  'role': 'user',
                                 };
 
                                 try {
@@ -299,10 +304,10 @@ class _SignupPageState extends State<SignupPage> {
       final snapshot = await transaction.get(trackerDoc);
       int lastNumber = 0;
       if (snapshot.exists) {
-        lastNumber = snapshot.data()!["lastNumber"] ?? 0;
+        lastNumber = snapshot.data()?["lastNumber"] ?? 0;
       }
       final newNumber = lastNumber + 1;
-      transaction.set(trackerDoc, {"lastNumber": newNumber});
+      transaction.set(trackerDoc, {"lastNumber": newNumber}, SetOptions(merge: true));
       return 'B$deptCode-${newNumber.toString().padLeft(3, '0')}-$year';
     });
   }

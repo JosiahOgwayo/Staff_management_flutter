@@ -32,9 +32,28 @@ class AuthService{
   Future<UserCredential> createAccount({
     required String email,
     required String password,
+    required String username,
   }) async{
-    return await firebaseAuth.createUserWithEmailAndPassword(
-        email: email, password: password);
+    // ignore: non_constant_identifier_names
+    final UserCredential = await firebaseAuth.createUserWithEmailAndPassword(
+      email: email, 
+      password: password
+    );
+
+    final uid = UserCredential.user!.uid;
+
+    await saveUserInfo(
+      uid: uid,
+      data: {
+        'email': email,
+        'username': username,
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+    );
+
+    return UserCredential;
+    
   }
 
   Future<void> signOut() async{

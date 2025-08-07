@@ -54,3 +54,36 @@ A powerful employee management mobile application built with **Flutter**, **Fire
 - Firebase project set up
 - Python 3.13.4 (for admin scripts / push notifications)
 - VSCode (with Flutter plugins)
+
+### ROADMAP
+
+//Task with the '>' show completed
+
+> Authentication (Email, Phone)
+>Clock-in functionality
+> Admin dashboard
+> Profile page
+>Push notifications for tasks & messages
+
+ Task assignment tracking
+
+ Monthly attendance reports
+
+ Leave application(approval and denial)
+
+ Messaging
+
+ UI polishing and theming
+
+## Backend Push Notification Service
+
+A simple FastAPI backend that sends Firebase Cloud Messaging (FCM) notifications.
+
+## Setup
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/JosiahOgwayo/Staff_management_flutter.git
+   cd Staff_management_flutter/backend_push
+
