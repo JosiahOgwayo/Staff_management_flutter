@@ -16,6 +16,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _startDateController = TextEditingController();
   final TextEditingController _endDateController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
   String _leaveType = 'Annual';
 
   final user = FirebaseAuth.instance.currentUser;
@@ -37,9 +38,21 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
 
   Future<void> _submitLeaveRequest() async {
     if (_formKey.currentState!.validate()) {
+      // Fetch username once from users collection or fallback to displayName
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+
+      final username = userDoc.data()?['username'] ??
+          user!.displayName ??
+          'Unknown';
+
       await FirebaseFirestore.instance.collection('leave_requests').add({
         'userId': user!.uid,
+        'username': username, // store username
         'type': _leaveType,
+        'reason': _reasonController.text.trim(),
         'startDate': _startDateController.text,
         'endDate': _endDateController.text,
         'status': 'Pending',
@@ -52,6 +65,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
 
       _startDateController.clear();
       _endDateController.clear();
+      _reasonController.clear();
       setState(() {
         _leaveType = 'Annual';
       });
@@ -83,10 +97,20 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                     items: const [
                       DropdownMenuItem(value: 'Annual', child: Text('Annual')),
                       DropdownMenuItem(value: 'Sick', child: Text('Sick')),
-                      DropdownMenuItem(
-                          value: 'Maternity', child: Text('Maternity')),
+                      DropdownMenuItem(value: 'Maternity', child: Text('Maternity')),
+                      DropdownMenuItem(value: 'Emergency', child: Text('Emergency')), // New type
                     ],
                     decoration: const InputDecoration(labelText: 'Leave Type'),
+                  ),
+                  TextFormField(
+                    controller: _reasonController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason for Leave',
+                      alignLabelWithHint: true,
+                    ),
+                    validator: (value) =>
+                        value!.trim().isEmpty ? 'Enter a reason' : null,
                   ),
                   TextFormField(
                     controller: _startDateController,
@@ -115,6 +139,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
             ),
             const SizedBox(height: 20),
 
+            // Leave requests list
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -136,7 +161,6 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                         child: Text('No leave requests yet'));
                   }
 
-                  // sort by createdAt if present
                   final docs = snapshot.data!.docs.toList();
                   docs.sort((a, b) {
                     final aData = a.data() as Map<String, dynamic>;
@@ -152,13 +176,13 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                   return ListView.builder(
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
-                      final data =
-                          docs[index].data() as Map<String, dynamic>;
+                      final data = docs[index].data() as Map<String, dynamic>;
                       return Card(
                         child: ListTile(
-                          title: Text('${data['type']} Leave'),
+                          title: Text(
+                              '${data['username']} - ${data['type']} Leave'),
                           subtitle: Text(
-                            'From ${data['startDate']} to ${data['endDate']}\nStatus: ${data['status']}',
+                            'Reason: ${data['reason'] ?? ''}\nFrom ${data['startDate']} to ${data['endDate']}\nStatus: ${data['status']}',
                           ),
                         ),
                       );

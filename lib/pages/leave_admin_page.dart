@@ -53,7 +53,10 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
     if (selectedStatus == 'all') {
       return baseQuery.snapshots();
     } else {
-      return baseQuery.where('status', isEqualTo: selectedStatus).snapshots();
+      // Normalize to lowercase for matching
+      return baseQuery
+          .where('status', isEqualTo: selectedStatus.toLowerCase())
+          .snapshots();
     }
   }
 
@@ -72,21 +75,27 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
     final docSnapshot = await docRef.get();
     if (!docSnapshot.exists) return;
 
-    await docRef.update({'status': status});
+    await docRef.update({'status': status.toLowerCase()});
 
     final userId = docSnapshot['userId'];
-    final name = docSnapshot['name'];
     final userDoc =
         await FirebaseFirestore.instance.collection('users').doc(userId).get();
-    final fcmToken = userDoc['fcmToken'];
 
-    await sendPushNotificationToUser(
-        fcmToken, "Leave Request $status", "Hi $name, your leave has been $status.");
+    String name = userDoc.data()?['username'] ?? 'User';
+    String? fcmToken = userDoc.data()?['fcmToken'];
+
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      await sendPushNotificationToUser(
+        fcmToken,
+        "Leave Request $status",
+        "Hi $name, your leave has been $status.",
+      );
+    }
   }
 
   Future<void> sendPushNotificationToUser(
       String token, String title, String body) async {
-    final url = Uri.parse('http://127.0.0.1:8000/send-notification/');
+    final url = Uri.parse('http://192.168.100.237:8000/send-notification/');
     await http.post(url, body: {
       'token': token,
       'title': title,
@@ -95,7 +104,7 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
   }
 
   void refreshData() {
-    setState(() {}); // Triggers StreamBuilder to reload
+    setState(() {}); // reload stream
   }
 
   @override
@@ -138,7 +147,7 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search by name or date (yyyy-mm-dd)',
+                hintText: 'Search by username or date (yyyy-mm-dd)',
                 filled: true,
                 fillColor: Colors.white,
                 prefixIcon: const Icon(Icons.search),
@@ -162,10 +171,9 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
             return const Center(child: Text('No leave requests found'));
           }
 
-          // Apply search filter
-          final docs = snapshot.data!.docs.where((doc) {
+          final requests = snapshot.data!.docs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            final name = (data['name'] ?? '').toString().toLowerCase();
+            final username = (data['username'] ?? '').toString().toLowerCase();
 
             final startDateObj = _parseDate(data['startDate']);
             final endDateObj = _parseDate(data['endDate']);
@@ -177,34 +185,36 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
                 ? endDateObj.toString().split(' ')[0]
                 : '';
 
-            return name.contains(searchQuery) ||
+            return username.contains(searchQuery) ||
                 startDate.contains(searchQuery) ||
                 endDate.contains(searchQuery);
           }).toList();
 
-          if (docs.isEmpty) {
+          if (requests.isEmpty) {
             return const Center(child: Text('No matching leave requests'));
           }
 
           return ListView.builder(
-            itemCount: docs.length,
+            itemCount: requests.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final status = (data['status'] ?? '').toString();
+              final data =
+                  requests[index].data() as Map<String, dynamic>;
+              final status = (data['status'] ?? '').toString().toLowerCase();
+              final leaveType = (data['type'] ?? 'Unknown');
 
               return Card(
                 margin:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: ListTile(
-                  title: Text('${data['name']} - ${data['type']}'),
+                  title: Text('${data['username'] ?? 'Unknown'} - $leaveType'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Reason: ${data['reason']}'),
+                      Text('Reason: ${data['reason'] ?? ''}'),
                       Text('From: ${_parseDate(data['startDate']) ?? 'N/A'}'),
                       Text('To: ${_parseDate(data['endDate']) ?? 'N/A'}'),
                       Text(
-                        'Status: ${status.isNotEmpty ? status[0].toUpperCase() + status.substring(1) : ''}',
+                        'Status: ${status[0].toUpperCase()}${status.substring(1)}',
                       ),
                     ],
                   ),
@@ -214,13 +224,13 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
                           children: [
                             IconButton(
                               icon: const Icon(Icons.check, color: Colors.green),
-                              onPressed: () =>
-                                  updateLeaveStatus(docs[index].id, 'approved'),
+                              onPressed: () => updateLeaveStatus(
+                                  requests[index].id, 'approved'),
                             ),
                             IconButton(
                               icon: const Icon(Icons.close, color: Colors.red),
-                              onPressed: () =>
-                                  updateLeaveStatus(docs[index].id, 'denied'),
+                              onPressed: () => updateLeaveStatus(
+                                  requests[index].id, 'denied'),
                             ),
                           ],
                         )
