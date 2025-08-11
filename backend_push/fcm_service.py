@@ -3,21 +3,21 @@ from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, messaging
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Get credential file path from environment variable
+# Path to my Firebase service account key JSON file
 cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
 
-# Initialize Firebase Admin SDK once (only if not already initialized)
+# Initialize Firebase Admin SDK once
 if not firebase_admin._apps:
-    if cred_path:
+    if cred_path and os.path.exists(cred_path):
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
     else:
-        raise ValueError("FIREBASE_CREDENTIALS_PATH not found in environment variables")
+        raise ValueError("FIREBASE_CREDENTIALS_PATH not set or file does not exist")
 
-def send_push_notification(token: str, title: str, body: str):
+def send_push_notification(token: str, title: str, body: str) -> bool:
+    """Send push notification via Firebase Cloud Messaging."""
     message = messaging.Message(
         notification=messaging.Notification(
             title=title,
@@ -28,8 +28,8 @@ def send_push_notification(token: str, title: str, body: str):
 
     try:
         response = messaging.send(message)
-        print(f"Notification sent successfully: {response}")
+        print(f"✅ Notification sent: {response}")
         return True
     except Exception as e:
-        print(f"Failed to send notification: {e}")
+        print(f"❌ Failed to send notification: {e}")
         return False

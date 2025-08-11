@@ -1,11 +1,12 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class LeaveRequestPage extends StatefulWidget {
-  const LeaveRequestPage({super.key});
+  const LeaveRequestPage({Key? key}) : super(key: key);
 
   @override
   State<LeaveRequestPage> createState() => _LeaveRequestPageState();
@@ -13,53 +14,35 @@ class LeaveRequestPage extends StatefulWidget {
 
 class _LeaveRequestPageState extends State<LeaveRequestPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController reasonController = TextEditingController();
+  final TextEditingController _startDateController = TextEditingController();
+  final TextEditingController _endDateController = TextEditingController();
+  String _leaveType = 'Annual';
 
-  DateTime? startDate;
-  DateTime? endDate;
-  String selectedLeaveType = 'Sick Leave';
-  bool isSubmitting = false;
+  final user = FirebaseAuth.instance.currentUser;
 
-  Future<void> pickDate({required bool isStart}) async {
-    DateTime initialDate = DateTime.now();
-    DateTime? picked = await showDatePicker(
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
+    DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(2023),
-      lastDate: DateTime(2030),
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
     );
 
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          startDate = picked;
-        } else {
-          endDate = picked;
-        }
-      });
+    if (pickedDate != null) {
+      String formattedDate = DateFormat('yyyy-MM-dd').format(pickedDate);
+      controller.text = formattedDate;
     }
   }
 
-  Future<void> submitLeaveRequest() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (startDate == null || endDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select both start and end dates')),
-      );
-      return;
-    }
-
-    setState(() => isSubmitting = true);
-
-    try {
+  Future<void> _submitLeaveRequest() async {
+    if (_formKey.currentState!.validate()) {
       await FirebaseFirestore.instance.collection('leave_requests').add({
-        'userId': 'user?.uid', 
-        'name': 'username',    
-        'type': selectedLeaveType,
-        'reason': reasonController.text,
-        'startDate': Timestamp.fromDate(startDate!),
-        'endDate': Timestamp.fromDate(endDate!),
-        'status': 'pending',
+        'userId': user!.uid,
+        'type': _leaveType,
+        'startDate': _startDateController.text,
+        'endDate': _endDateController.text,
+        'status': 'Pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -67,75 +50,124 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
         const SnackBar(content: Text('Leave request submitted')),
       );
 
-      reasonController.clear();
+      _startDateController.clear();
+      _endDateController.clear();
       setState(() {
-        startDate = null;
-        endDate = null;
-        selectedLeaveType = 'Sick Leave';
+        _leaveType = 'Annual';
       });
-    } catch (e) {
-      debugPrint('Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Submission failed')),
-      );
     }
-
-    setState(() => isSubmitting = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Leave Request')),
+      appBar: AppBar(
+        title: const Text('Leave Request'),
+        backgroundColor: Colors.grey[900],
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              DropdownButtonFormField<String>(
-                value: selectedLeaveType,
-                decoration: const InputDecoration(labelText: 'Leave Type'),
-                items: const [
-                  DropdownMenuItem(value: 'Sick Leave', child: Text('Sick Leave')),
-                  DropdownMenuItem(value: 'Annual Leave', child: Text('Annual Leave')),
-                  DropdownMenuItem(value: 'Emergency Leave', child: Text('Emergency Leave')),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _leaveType,
+                    onChanged: (value) {
+                      setState(() {
+                        _leaveType = value!;
+                      });
+                    },
+                    items: const [
+                      DropdownMenuItem(value: 'Annual', child: Text('Annual')),
+                      DropdownMenuItem(value: 'Sick', child: Text('Sick')),
+                      DropdownMenuItem(
+                          value: 'Maternity', child: Text('Maternity')),
+                    ],
+                    decoration: const InputDecoration(labelText: 'Leave Type'),
+                  ),
+                  TextFormField(
+                    controller: _startDateController,
+                    readOnly: true,
+                    decoration:
+                        const InputDecoration(labelText: 'Start Date'),
+                    onTap: () => _selectDate(context, _startDateController),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Select start date' : null,
+                  ),
+                  TextFormField(
+                    controller: _endDateController,
+                    readOnly: true,
+                    decoration: const InputDecoration(labelText: 'End Date'),
+                    onTap: () => _selectDate(context, _endDateController),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Select end date' : null,
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: _submitLeaveRequest,
+                    child: const Text('Submit Request'),
+                  ),
                 ],
-                onChanged: (value) => setState(() => selectedLeaveType = value!),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: reasonController,
-                decoration: const InputDecoration(labelText: 'Reason'),
-                maxLines: 3,
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Please enter a reason' : null,
+            ),
+            const SizedBox(height: 20),
+
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('leave_requests')
+                    .where('userId', isEqualTo: user!.uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Error: ${snapshot.error.toString()}'));
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                        child: Text('No leave requests yet'));
+                  }
+
+                  // sort by createdAt if present
+                  final docs = snapshot.data!.docs.toList();
+                  docs.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+                    final aTime = aData['createdAt'] as Timestamp?;
+                    final bTime = bData['createdAt'] as Timestamp?;
+                    if (aTime == null && bTime == null) return 0;
+                    if (aTime == null) return 1;
+                    if (bTime == null) return -1;
+                    return bTime.compareTo(aTime);
+                  });
+
+                  return ListView.builder(
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data =
+                          docs[index].data() as Map<String, dynamic>;
+                      return Card(
+                        child: ListTile(
+                          title: Text('${data['type']} Leave'),
+                          subtitle: Text(
+                            'From ${data['startDate']} to ${data['endDate']}\nStatus: ${data['status']}',
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                title: Text(startDate == null
-                    ? 'Start Date'
-                    : DateFormat('yMMMd').format(startDate!)),
-                trailing: const Icon(Icons.date_range),
-                onTap: () => pickDate(isStart: true),
-              ),
-              ListTile(
-                title: Text(endDate == null
-                    ? 'End Date'
-                    : DateFormat('yMMMd').format(endDate!)),
-                trailing: const Icon(Icons.date_range),
-                onTap: () => pickDate(isStart: false),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: isSubmitting ? null : submitLeaveRequest,
-                icon: isSubmitting
-                    ? const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
-                    : const Icon(Icons.send),
-                label: Text(isSubmitting ? 'Submitting...' : 'Submit Request'),
-              )
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

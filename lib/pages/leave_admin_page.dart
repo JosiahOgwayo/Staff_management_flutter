@@ -13,10 +13,10 @@ class LeaveAdminPage extends StatefulWidget {
 class _LeaveAdminPageState extends State<LeaveAdminPage> {
   bool isLoading = true;
   bool isAdmin = false;
-  String selectedStatus = 'pending';
+  String selectedStatus = 'all';
   String searchQuery = '';
 
-  final List<String> statusOptions = ['pending', 'approved', 'denied'];
+  final List<String> statusOptions = ['all', 'pending', 'approved', 'denied'];
 
   @override
   void initState() {
@@ -26,17 +26,49 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
 
   Future<void> checkAdminStatus() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (doc.exists && doc['role'] == 'admin') {
-      setState(() => isAdmin = true);
+    if (user == null) {
+      setState(() {
+        isAdmin = false;
+        isLoading = false;
+      });
+      return;
     }
-    setState(() => isLoading = false);
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    setState(() {
+      isAdmin = doc.exists && doc['role'] == 'admin';
+      isLoading = false;
+    });
+  }
+
+  Stream<QuerySnapshot> getLeaveRequestsStream() {
+    final baseQuery = FirebaseFirestore.instance
+        .collection('leave_requests')
+        .orderBy('createdAt', descending: true);
+
+    if (selectedStatus == 'all') {
+      return baseQuery.snapshots();
+    } else {
+      return baseQuery.where('status', isEqualTo: selectedStatus).snapshots();
+    }
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    return null;
   }
 
   Future<void> updateLeaveStatus(String docId, String status) async {
-    final docRef = FirebaseFirestore.instance.collection('leave_requests').doc(docId);
+    final docRef =
+        FirebaseFirestore.instance.collection('leave_requests').doc(docId);
     final docSnapshot = await docRef.get();
     if (!docSnapshot.exists) return;
 
@@ -44,13 +76,16 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
 
     final userId = docSnapshot['userId'];
     final name = docSnapshot['name'];
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    final userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
     final fcmToken = userDoc['fcmToken'];
 
-    await sendPushNotificationToUser(fcmToken, "Leave Request $status", "Hi $name, your leave has been $status.");
+    await sendPushNotificationToUser(
+        fcmToken, "Leave Request $status", "Hi $name, your leave has been $status.");
   }
 
-  Future<void> sendPushNotificationToUser(String token, String title, String body) async {
+  Future<void> sendPushNotificationToUser(
+      String token, String title, String body) async {
     final url = Uri.parse('http://127.0.0.1:8000/send-notification/');
     await http.post(url, body: {
       'token': token,
@@ -65,23 +100,28 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     if (!isAdmin) {
-      return const Scaffold(body: Center(child: Text('Access Denied. Admins only.')));
+      return const Scaffold(
+          body: Center(child: Text('Access Denied. Admins only.')));
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Leave Requests'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: refreshData), // 🔄 Refresh
+          IconButton(icon: const Icon(Icons.refresh), onPressed: refreshData),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: DropdownButton<String>(
               value: selectedStatus,
               onChanged: (value) {
-                if (value != null) setState(() => selectedStatus = value);
+                if (value != null) {
+                  setState(() => selectedStatus = value);
+                }
               },
               items: statusOptions.map((status) {
                 return DropdownMenuItem(
@@ -102,47 +142,70 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
                 filled: true,
                 fillColor: Colors.white,
                 prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onChanged: (value) => setState(() => searchQuery = value.toLowerCase().trim()),
+              onChanged: (value) =>
+                  setState(() => searchQuery = value.toLowerCase().trim()),
             ),
           ),
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('leave_requests')
-            .where('status', isEqualTo: selectedStatus)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: getLeaveRequestsStream(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('No leave requests found'));
+          }
+
+          // Apply search filter
           final docs = snapshot.data!.docs.where((doc) {
-            final name = doc['name'].toString().toLowerCase();
-            final startDate = (doc['startDate'] as Timestamp).toDate().toString().split(' ')[0];
-            final endDate = (doc['endDate'] as Timestamp).toDate().toString().split(' ')[0];
-            return name.contains(searchQuery) || startDate.contains(searchQuery) || endDate.contains(searchQuery);
+            final data = doc.data() as Map<String, dynamic>;
+            final name = (data['name'] ?? '').toString().toLowerCase();
+
+            final startDateObj = _parseDate(data['startDate']);
+            final endDateObj = _parseDate(data['endDate']);
+
+            final startDate = startDateObj != null
+                ? startDateObj.toString().split(' ')[0]
+                : '';
+            final endDate = endDateObj != null
+                ? endDateObj.toString().split(' ')[0]
+                : '';
+
+            return name.contains(searchQuery) ||
+                startDate.contains(searchQuery) ||
+                endDate.contains(searchQuery);
           }).toList();
 
-          if (docs.isEmpty) return const Center(child: Text('No matching leave requests'));
+          if (docs.isEmpty) {
+            return const Center(child: Text('No matching leave requests'));
+          }
 
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final data = docs[index];
-              final status = data['status'];
+              final data = docs[index].data() as Map<String, dynamic>;
+              final status = (data['status'] ?? '').toString();
+
               return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: ListTile(
                   title: Text('${data['name']} - ${data['type']}'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Reason: ${data['reason']}'),
-                      Text('From: ${data['startDate'].toDate()}'),
-                      Text('To: ${data['endDate'].toDate()}'),
-                      Text('Status: ${status[0].toUpperCase() + status.substring(1)}'),
+                      Text('From: ${_parseDate(data['startDate']) ?? 'N/A'}'),
+                      Text('To: ${_parseDate(data['endDate']) ?? 'N/A'}'),
+                      Text(
+                        'Status: ${status.isNotEmpty ? status[0].toUpperCase() + status.substring(1) : ''}',
+                      ),
                     ],
                   ),
                   trailing: status == 'pending'
@@ -151,11 +214,13 @@ class _LeaveAdminPageState extends State<LeaveAdminPage> {
                           children: [
                             IconButton(
                               icon: const Icon(Icons.check, color: Colors.green),
-                              onPressed: () => updateLeaveStatus(data.id, 'approved'),
+                              onPressed: () =>
+                                  updateLeaveStatus(docs[index].id, 'approved'),
                             ),
                             IconButton(
                               icon: const Icon(Icons.close, color: Colors.red),
-                              onPressed: () => updateLeaveStatus(data.id, 'denied'),
+                              onPressed: () =>
+                                  updateLeaveStatus(docs[index].id, 'denied'),
                             ),
                           ],
                         )

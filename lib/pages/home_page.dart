@@ -1,8 +1,12 @@
 import 'package:employee_app_new/auth_service.dart';
+import 'package:employee_app_new/pages/clock_in_history_page.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:employee_app_new/pages/profile_page.dart';
 import 'package:employee_app_new/pages/admin_dashboard_page.dart';
+import 'package:employee_app_new/pages/leave_admin_page.dart';
+import 'package:employee_app_new/pages/leave_request_page.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -60,7 +64,7 @@ class HomePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Welcome $firstName'),
+                  Text('Welcome $firstName', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Text('You are currently: $statusText', style: TextStyle(fontWeight: FontWeight.bold)),
                   if (isAdmin) ...[
@@ -73,6 +77,37 @@ class HomePage extends StatelessWidget {
                       },
                       icon: const Icon(Icons.admin_panel_settings),
                       label: const Text('Admin Dashboard'),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const ClockInHistoryPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.history),
+                      label: const Text('Clock In History'),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const LeaveAdminPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.request_page),
+                      label: const Text('Leave Requests'),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const LeaveRequestPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.request_page),
+                      label: const Text('Request Leave'),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -140,27 +175,47 @@ class HomePage extends StatelessWidget {
           );
         },
       ),
-      bottomNavigationBar: BottomAppBar(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            
-            children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
-                  );
-                  
-                },
-                icon: const Icon(Icons.person),
-                label: const Text('Profile'),
+      bottomNavigationBar: FutureBuilder(
+        future: AuthService().firestore
+            .collection('users')
+            .doc(AuthService().currentUser?.uid)
+            .get(),
+      builder: (context, snapshot) {
+        final isAdmin = snapshot.hasData && snapshot.data?.data()?['role'] == 'admin';
+
+        return BottomAppBar(
+          color: Colors.grey[700],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (isAdmin)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+                      );
+                    },
+                icon: const Icon(Icons.admin_panel_settings),
+                label: const Text('Admin'),
               ),
-            ],
-          ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+              icon: const Icon(Icons.person),
+              label: const Text('Profile'),
+            ),
+          ],
         ),
       ),
+    );
+  },
+),
+      
     );
   }
 }

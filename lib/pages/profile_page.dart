@@ -25,12 +25,12 @@ Future<void> sendPushToAdmin(String token, String title, String body) async {
     );
 
     if (response.statusCode == 200) {
-      debugPrint('✅ Notification sent to $token');
+      debugPrint(' Notification sent to $token');
     } else {
-      debugPrint('❌ Failed to send: ${response.body}');
+      debugPrint(' Failed to send: ${response.body}');
     }
   } catch (e) {
-    debugPrint('❌ Error sending notification: $e');
+    debugPrint(' Error sending notification: $e');
   }
 }
 
@@ -91,6 +91,8 @@ class _ProfilePageState extends State<ProfilePage> {
       await auth?.clockIn();
 
       setState(() => _isClockedIn = true);
+      //await auth?.clockIn();
+      debugPrint("Clock-in method finished");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You have clocked in.'))
       );
@@ -113,8 +115,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
     } catch (e) {
+      debugPrint(" Clock-in failed: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to clock in.'))
+        
+        const SnackBar(content: Text('Failed to clock in: '))
       );
     } finally {
       setState(() => _isClocking = false);
@@ -122,30 +126,58 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserData() async {
-    setState(() => _loading = true);
-    try {
-      final user = _authService.currentUser;
-      if (user != null) {
-        final doc = await _authService.firestore.collection('users').doc(user.uid).get();
-        if (!mounted) return;
-        setState(() {
-          _profilePicUrl = doc.data()?['profilePicture'];
-          _username = doc.data()?['username'] ?? user.displayName ?? user.email;
-          _email = doc.data()?['email'] ?? user.email;
-          _staffNumber = doc.data()?['staffNumber'];
-          _department = doc.data()?['department'];
-          _yearJoined = doc.data()?['yearJoined'];
-        });
-      }
-    } catch (e) {
+  setState(() => _loading = true);
+  try {
+    final user = _authService.currentUser;
+    if (user != null) {
+      debugPrint("🔍 Logged in UID: ${user.uid}");
+
+      final doc = await _authService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load user data: \${e.toString()}'))
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
+
+      if (!doc.exists) {
+        debugPrint("⚠️ No Firestore document found for this UID.");
+      } else {
+        debugPrint("📄 Firestore document data: ${doc.data()}");
+      }
+
+      final data = doc.data();
+
+      setState(() {
+        _profilePicUrl = data?['profilePicture'];
+        debugPrint("🖼 Profile picture URL: $_profilePicUrl");
+
+        _username = data?['username'] ?? user.displayName ?? user.email;
+        debugPrint("👤 Username: $_username");
+
+        _email = data?['email'] ?? user.email;
+        debugPrint("📧 Email: $_email");
+
+        _staffNumber = data?['staffNumber'];
+        debugPrint("🆔 Staff Number: $_staffNumber");
+
+        _department = data?['department'];
+        debugPrint("🏢 Department: $_department");
+
+        _yearJoined = data?['yearJoined'];
+        debugPrint("📅 Year Joined: $_yearJoined");
+      });
     }
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to load user data: ${e.toString()}'))
+    );
+    debugPrint("❌ Error loading user data: $e");
+  } finally {
+    if (mounted) setState(() => _loading = false);
   }
+}
+
 
   String? getOptimizedCloudinaryUrl(String? url) {
     if (url == null || !url.contains('/upload/')) return url;
@@ -167,7 +199,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to log out: \${e.toString()}'))
+        SnackBar(content: Text('Failed to log out: ${e.toString()}'))
       );
     }
   }
@@ -223,10 +255,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
                           ),
                           const SizedBox(height: 8),
-                          if (_email != null) Text('Email: \$_email'),
-                          if (_staffNumber != null) Text('Staff Number: \$_staffNumber'),
-                          if (_department != null) Text('Department: \$_department'),
-                          if (_yearJoined != null) Text('Year Joined: \$_yearJoined'),
+                          if (_email != null) Text('Email: $_email'),
+                          if (_staffNumber != null) Text('Staff Number: $_staffNumber'),
+                          if (_department != null) Text('Department: $_department'),
+                          if (_yearJoined != null) Text('Year Joined: $_yearJoined'),
                         ],
                       ),
                     ),
@@ -247,7 +279,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 12),
                   const Text(
                     'Settings', 
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18 )
                   ),
                   ListTile(
                     leading: const Icon(Icons.edit),
@@ -270,9 +302,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     onTap: () {
                       showAboutDialog(
                         context: context,
-                        applicationName: 'Employee App',
+                        applicationName: 'Staff Management App',
                         applicationVersion: '1.0.0',
-                        children: [const Text('This app is built with Flutter and Firebase.')],
+                        children: [const Text('This app helps manage staff attendance and tasks. Admins can view and manage all staff data. Users can clock in/out, update their profile, and view their tasks. Assigned tasks can be viewed and updated by both admins and users, whereby users can mark tasks as completed,pendng, or in-progress. Admins can assign tasks to users and view task status. Users can receive push notifications for important updates. Leave requests can be submitted by users and approved by admins.'),
+                        ],
                       );
                     },
                   ),
@@ -343,7 +376,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to upload profile picture: \${e.toString()}'),
+          content: Text('Failed to upload profile picture: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -390,7 +423,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed: \${e.toString()}'), 
+                    content: Text('Failed: ${e.toString()}'), 
                     backgroundColor: Colors.red
                   ),
                 );
@@ -440,7 +473,7 @@ class _ProfilePageState extends State<ProfilePage> {
               } catch (e) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed: \${e.toString()}'))
+                  SnackBar(content: Text('Failed: ${e.toString()}'))
                 );
               }
             },
@@ -503,7 +536,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed: \${e.toString()}'), 
+                    content: Text('Failed: ${e.toString()}'), 
                     backgroundColor: Colors.red
                   ),
                 );

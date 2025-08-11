@@ -64,12 +64,10 @@ A powerful employee management mobile application built with **Flutter**, **Fire
 > Admin dashboard
 > Profile page
 >Push notifications for tasks & messages
-
- Task assignment tracking
+>Task assignment tracking
+>Leave application(approval and denial)
 
  Monthly attendance reports
-
- Leave application(approval and denial)
 
  Messaging
 
